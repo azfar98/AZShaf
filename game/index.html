@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AZ VELOCITY — Hyper Racing</title>
+<style>
+  :root{
+    --neon:#00e5ff; --neon2:#ff2d78; --gold:#ffc83d;
+    --bg:#05060f; --panel:rgba(10,14,30,.88);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-user-select:none}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);
+    font-family:'Segoe UI',system-ui,Roboto,Arial,sans-serif;color:#eaf6ff}
+  canvas#gl{position:fixed;inset:0;display:block}
+
+  /* ---------- generic UI ---------- */
+  .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:18px;z-index:30;background:radial-gradient(ellipse at 50% 30%,rgba(20,30,70,.55),rgba(3,4,12,.92));
+    backdrop-filter:blur(2px);transition:opacity .3s}
+  .screen.overlay{background:rgba(3,4,12,.72)}
+  .hidden{display:none!important}
+  h1.logo{font-size:clamp(42px,7vw,84px);font-weight:900;letter-spacing:.12em;font-style:italic;
+    background:linear-gradient(90deg,#7df9ff,#00e5ff 35%,#ff2d78 75%,#ffc83d);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 0 22px rgba(0,229,255,.45));text-transform:uppercase}
+  .tagline{letter-spacing:.5em;font-size:13px;color:#9fd8ff;opacity:.85;text-transform:uppercase}
+  .btn{min-width:280px;text-align:center;padding:15px 38px;font-size:18px;font-weight:700;
+    letter-spacing:.18em;text-transform:uppercase;color:#dffaff;cursor:pointer;
+    background:linear-gradient(90deg,rgba(0,229,255,.12),rgba(0,229,255,.03));
+    border:1px solid rgba(0,229,255,.45);border-radius:4px;
+    clip-path:polygon(12px 0,100% 0,calc(100% - 12px) 100%,0 100%);
+    transition:all .15s}
+  .btn:hover{background:linear-gradient(90deg,rgba(0,229,255,.4),rgba(255,45,120,.25));
+    box-shadow:0 0 24px rgba(0,229,255,.5);transform:scale(1.04)}
+  .btn.pink{border-color:rgba(255,45,120,.55)}
+  .btn.pink:hover{box-shadow:0 0 24px rgba(255,45,120,.5)}
+  .btn.small{min-width:0;padding:9px 22px;font-size:13px}
+  .row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center}
+  .panel{background:var(--panel);border:1px solid rgba(0,229,255,.25);border-radius:10px;
+    padding:22px 28px;box-shadow:0 8px 40px rgba(0,0,0,.6)}
+  .htitle{font-size:26px;font-weight:800;letter-spacing:.3em;text-transform:uppercase;color:var(--neon);
+    text-shadow:0 0 14px rgba(0,229,255,.6)}
+
+  /* ---------- garage ---------- */
+  #garage{justify-content:flex-end;padding-bottom:4vh;background:transparent;pointer-events:none;backdrop-filter:none}
+  #garage>*{pointer-events:auto}
+  #garageTop{position:fixed;top:3vh;left:0;right:0;display:flex;justify-content:center}
+  #carName{font-size:clamp(26px,4vw,46px);font-weight:900;font-style:italic;letter-spacing:.08em;
+    text-transform:uppercase;text-shadow:0 0 18px rgba(0,229,255,.7)}
+  #carClass{color:var(--gold);letter-spacing:.4em;font-size:13px;text-transform:uppercase;text-align:center;margin-top:4px}
+  #statBox{display:grid;grid-template-columns:110px 1fr 48px;gap:7px 12px;align-items:center;width:min(440px,86vw)}
+  .statlb{font-size:12px;letter-spacing:.2em;color:#9fd8ff;text-transform:uppercase}
+  .statbar{height:9px;background:rgba(255,255,255,.08);border-radius:5px;overflow:hidden}
+  .statbar>i{display:block;height:100%;border-radius:5px;
+    background:linear-gradient(90deg,#00e5ff,#ff2d78);box-shadow:0 0 8px rgba(0,229,255,.8);transition:width .35s}
+  .statval{font-size:12px;color:#fff;font-weight:700;text-align:right}
+  .arrow{font-size:46px;color:var(--neon);cursor:pointer;padding:0 18px;transition:all .15s;background:none;border:none}
+  .arrow:hover{transform:scale(1.3);text-shadow:0 0 18px var(--neon)}
+
+  /* ---------- track select ---------- */
+  #trackGrid{display:grid;grid-template-columns:repeat(3,minmax(200px,250px));gap:18px;max-width:90vw}
+  @media(max-width:760px){#trackGrid{grid-template-columns:repeat(2,minmax(150px,1fr))}}
+  .trackCard{position:relative;border:1px solid rgba(0,229,255,.3);border-radius:10px;overflow:hidden;
+    cursor:pointer;background:#0a0e1e;transition:all .18s}
+  .trackCard:hover{transform:translateY(-5px) scale(1.03);box-shadow:0 10px 30px rgba(0,229,255,.35);border-color:var(--neon)}
+  .trackCard.sel{border-color:var(--gold);box-shadow:0 0 26px rgba(255,200,61,.5)}
+  .trackCard canvas{width:100%;display:block}
+  .tcName{padding:10px 12px 3px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:14px}
+  .tcSub{padding:0 12px 12px;font-size:11px;color:#8fb8d8;letter-spacing:.15em;text-transform:uppercase}
+
+  /* ---------- settings ---------- */
+  .optRow{display:flex;justify-content:space-between;align-items:center;gap:30px;width:min(460px,84vw);padding:8px 0}
+  .optRow .lb{letter-spacing:.2em;font-size:13px;text-transform:uppercase;color:#9fd8ff}
+  .seg{display:flex;border:1px solid rgba(0,229,255,.4);border-radius:5px;overflow:hidden}
+  .seg button{background:transparent;border:none;color:#bfe9ff;padding:8px 16px;cursor:pointer;
+    font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:700}
+  .seg button.on{background:var(--neon);color:#02131a;box-shadow:0 0 14px rgba(0,229,255,.7)}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:20;font-variant-numeric:tabular-nums}
+  #speedBox{position:absolute;right:3vw;bottom:4vh;text-align:right}
+  #speedVal{font-size:clamp(48px,6vw,76px);font-weight:900;font-style:italic;line-height:.9;
+    text-shadow:0 0 18px rgba(0,229,255,.8)}
+  #speedUnit{font-size:14px;letter-spacing:.4em;color:#9fd8ff}
+  #nitroWrap{width:min(230px,26vw);height:12px;margin-top:10px;margin-left:auto;border:1px solid rgba(0,229,255,.5);
+    border-radius:6px;overflow:hidden;background:rgba(0,0,0,.45);transform:skewX(-18deg)}
+  #nitroBar{height:100%;width:100%;background:linear-gradient(90deg,#0066ff,#00e5ff,#aef9ff);
+    box-shadow:0 0 12px #00e5ff;transition:width .08s linear}
+  #nitroLb{font-size:10px;letter-spacing:.5em;color:#7fdfff;margin-top:4px}
+  #posBox{position:absolute;left:3vw;bottom:4vh}
+  #posVal{font-size:clamp(46px,6vw,72px);font-weight:900;font-style:italic;color:var(--gold);
+    text-shadow:0 0 18px rgba(255,200,61,.7);line-height:.9}
+  #posVal sup{font-size:.38em}
+  #lapVal{font-size:16px;letter-spacing:.25em;color:#bfe9ff;margin-top:6px;text-transform:uppercase}
+  #timer{position:absolute;top:2.5vh;left:50%;transform:translateX(-50%);font-size:24px;font-weight:700;
+    letter-spacing:.12em;color:#dffaff;text-shadow:0 0 10px rgba(0,229,255,.6)}
+  #minimap{position:absolute;top:2.5vh;right:2.5vw;width:170px;height:170px;opacity:.92}
+  #wrongWay{position:absolute;top:30%;left:50%;transform:translateX(-50%);font-size:34px;font-weight:900;
+    color:var(--neon2);letter-spacing:.2em;text-shadow:0 0 20px var(--neon2);animation:blink .5s infinite alternate}
+  @keyframes blink{from{opacity:.25}to{opacity:1}}
+  #raceMsg{position:absolute;top:22%;left:50%;transform:translateX(-50%);font-size:clamp(40px,8vw,96px);
+    font-weight:900;font-style:italic;letter-spacing:.1em;text-transform:uppercase;
+    background:linear-gradient(90deg,#00e5ff,#ff2d78);-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 0 26px rgba(0,229,255,.6))}
+  #boostFlash{position:fixed;inset:0;pointer-events:none;z-index:15;opacity:0;
+    background:radial-gradient(ellipse at center,transparent 55%,rgba(0,180,255,.28));transition:opacity .2s}
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:14;
+    background:radial-gradient(ellipse at center,transparent 62%,rgba(0,0,5,.55))}
+  #ctrlHint{position:absolute;bottom:1.4vh;left:50%;transform:translateX(-50%);font-size:11px;
+    letter-spacing:.18em;color:#6fa9c9;text-transform:uppercase;white-space:nowrap}
+
+  /* ---------- results ---------- */
+  #resultsList{display:flex;flex-direction:column;gap:6px;width:min(480px,88vw)}
+  .resRow{display:flex;justify-content:space-between;gap:16px;padding:10px 18px;border-radius:6px;
+    background:rgba(255,255,255,.05);font-size:15px;letter-spacing:.06em}
+  .resRow.me{background:linear-gradient(90deg,rgba(255,200,61,.25),rgba(255,45,120,.18));
+    border:1px solid rgba(255,200,61,.6);font-weight:800}
+  .resPos{color:var(--neon);font-weight:800;width:36px}
+  .resTime{color:#9fd8ff}
+
+  #loading{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
+    background:#04050d;flex-direction:column;gap:18px}
+  .spin{width:54px;height:54px;border-radius:50%;border:3px solid rgba(0,229,255,.2);
+    border-top-color:var(--neon);animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="vignette"></div>
+<div id="boostFlash"></div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div id="timer">0:00.000</div>
+  <canvas id="minimap" width="340" height="340"></canvas>
+  <div id="posBox"><div id="posVal">1<sup>st</sup></div><div id="lapVal">LAP 1/3</div></div>
+  <div id="speedBox">
+    <div id="speedVal">0</div><div id="speedUnit">KM/H</div>
+    <div id="nitroWrap"><div id="nitroBar"></div></div>
+    <div id="nitroLb">NITRO &mdash; SPACE</div>
+  </div>
+  <div id="wrongWay" class="hidden">WRONG WAY!</div>
+  <div id="raceMsg" class="hidden"></div>
+  <div id="ctrlHint">W/&#8593; throttle &nbsp;&middot;&nbsp; S/&#8595; brake &nbsp;&middot;&nbsp; A D steer &nbsp;&middot;&nbsp; SPACE nitro &nbsp;&middot;&nbsp; SHIFT drift &nbsp;&middot;&nbsp; C camera &nbsp;&middot;&nbsp; ESC pause</div>
+</div>
+
+<!-- MAIN MENU -->
+<div id="menuMain" class="screen hidden">
+  <h1 class="logo">AZ Velocity</h1>
+  <div class="tagline">Hyper&nbsp;Arcade&nbsp;Racing</div>
+  <div style="height:10px"></div>
+  <button class="btn" id="btnPlay">Race</button>
+  <button class="btn" id="btnGarage">Garage</button>
+  <button class="btn" id="btnSettings">Settings</button>
+  <div style="height:6px"></div>
+  <div class="tagline" style="letter-spacing:.25em;font-size:11px;opacity:.6">10 hypercars &middot; 6 world circuits &middot; nitro &middot; drift</div>
+</div>
+
+<!-- GARAGE -->
+<div id="garage" class="screen hidden">
+  <div id="garageTop"><div><div id="carName">—</div><div id="carClass">—</div></div></div>
+  <div class="panel" style="display:flex;flex-direction:column;gap:14px;align-items:center">
+    <div class="row">
+      <button class="arrow" id="carPrev">&#10094;</button>
+      <div id="statBox">
+        <div class="statlb">Top speed</div><div class="statbar"><i id="stSpd"></i></div><div class="statval" id="stSpdV"></div>
+        <div class="statlb">Acceleration</div><div class="statbar"><i id="stAcc"></i></div><div class="statval" id="stAccV"></div>
+        <div class="statlb">Handling</div><div class="statbar"><i id="stHnd"></i></div><div class="statval" id="stHndV"></div>
+        <div class="statlb">Nitro</div><div class="statbar"><i id="stNit"></i></div><div class="statval" id="stNitV"></div>
+      </div>
+      <button class="arrow" id="carNext">&#10095;</button>
+    </div>
+    <div class="row">
+      <button class="btn small" id="garageBack">&#8592; Back</button>
+      <button class="btn small pink" id="garageSelect">Select &amp; Race</button>
+    </div>
+  </div>
+</div>
+
+<!-- TRACK SELECT -->
+<div id="menuTracks" class="screen hidden">
+  <div class="htitle">Select Circuit</div>
+  <div id="trackGrid"></div>
+  <div class="row">
+    <button class="btn small" id="tracksBack">&#8592; Back</button>
+    <button class="btn small pink" id="tracksGo">Start Race &#8594;</button>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="menuSettings" class="screen hidden">
+  <div class="htitle">Settings</div>
+  <div class="panel" style="display:flex;flex-direction:column;gap:4px">
+    <div class="optRow"><span class="lb">Graphics</span>
+      <div class="seg" id="segQuality"><button data-v="low">Low</button><button data-v="med">Med</button><button data-v="high">High</button></div></div>
+    <div class="optRow"><span class="lb">Laps</span>
+      <div class="seg" id="segLaps"><button data-v="1">1</button><button data-v="3">3</button><button data-v="5">5</button></div></div>
+    <div class="optRow"><span class="lb">Opponents</span>
+      <div class="seg" id="segBots"><button data-v="3">3</button><button data-v="5">5</button><button data-v="7">7</button></div></div>
+    <div class="optRow"><span class="lb">Sound</span>
+      <div class="seg" id="segSound"><button data-v="on">On</button><button data-v="off">Off</button></div></div>
+    <div class="optRow"><span class="lb">Camera shake</span>
+      <div class="seg" id="segShake"><button data-v="on">On</button><button data-v="off">Off</button></div></div>
+  </div>
+  <button class="btn small" id="settingsBack">&#8592; Back</button>
+</div>
+
+<!-- PAUSE -->
+<div id="menuPause" class="screen overlay hidden">
+  <div class="htitle">Paused</div>
+  <button class="btn" id="btnResume">Resume</button>
+  <button class="btn" id="btnRestart">Restart Race</button>
+  <button class="btn" id="btnQuit">Quit to Menu</button>
+</div>
+
+<!-- RESULTS -->
+<div id="menuResults" class="screen hidden">
+  <div class="htitle" id="resTitle">Race Complete</div>
+  <div id="resultsList"></div>
+  <div class="row">
+    <button class="btn small" id="resAgain">Race Again</button>
+    <button class="btn small pink" id="resMenu">Main Menu</button>
+  </div>
+</div>
+
+<div id="loading"><div class="spin"></div><div class="tagline">Loading engine&hellip;</div></div>
+
+<script src="./lib/three.min.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>
